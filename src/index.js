@@ -46,7 +46,8 @@ class MyGame extends Phaser.Scene {
         this.keyboardInput = this.input.keyboard.createCursorKeys();
         this.player.m_moving = false;
 
-        this.socket = io('http://localhost:3000');
+        // this.socket = io('http://localhost:3000');
+        this.socket = io('https://port-0-nest-socket-test-euegqv2lloh4rpfv.sel5.cloudtype.app');
 
         // 캐릭터 머리 위에 닉네임을 표시하기 위한 텍스트 스타일
         const nameTextStyle = {
