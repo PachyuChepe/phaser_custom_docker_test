@@ -14,8 +14,8 @@ class MyGame extends Phaser.Scene {
     preload() {
         this.load.image("background1", bgImg1);
         this.load.spritesheet("player", playerImg, {
-            frameWidth: 32,
-            frameHeight: 36,
+            frameWidth: 48,
+            frameHeight: 64,
         });
     }
 
@@ -25,7 +25,7 @@ class MyGame extends Phaser.Scene {
 
         this.anims.create({
             key: "player_anim",
-            frames: this.anims.generateFrameNumbers("player"),
+            frames: this.anims.generateFrameNumbers("player", { start: 4, end: 7 }),
             frameRate: 12,
             repeat: -1,
         });
@@ -43,11 +43,12 @@ class MyGame extends Phaser.Scene {
         });
 
         this.player.play("player_anim");
+        // this.player.play("player_idle");
         this.keyboardInput = this.input.keyboard.createCursorKeys();
         this.player.m_moving = false;
 
-        // this.socket = io('http://localhost:3000');
-        this.socket = io('https://port-0-nest-socket-test-euegqv2lloh4rpfv.sel5.cloudtype.app');
+        this.socket = io('http://localhost:3000');
+        // this.socket = io('https://port-0-nest-socket-test-euegqv2lloh4rpfv.sel5.cloudtype.app');
 
         // 캐릭터 머리 위에 닉네임을 표시하기 위한 텍스트 스타일
         const nameTextStyle = {
@@ -60,6 +61,7 @@ class MyGame extends Phaser.Scene {
             },
         };
 
+        // 상하좌우 애니메이션 강의참조해서 작성 업다운레프트라이트
         this.socket.on('players', (players) => {
             Object.keys(players).forEach(id => {
                 if (id === this.socket.id) {
@@ -162,7 +164,7 @@ class MyGame extends Phaser.Scene {
                 fill: '#ffffff' 
             }).setOrigin(0.5, 1.5);
         } else {
-            this.playerNameText.setPosition(this.player.x, this.player.y - 50); // 50은 캐릭터 위에 표시되는 높이
+            this.playerNameText.setPosition(this.player.x, this.player.y -10); // 50은 캐릭터 위에 표시되는 높이
             this.playerNameText.setText(this.nickname);
         }
     }
