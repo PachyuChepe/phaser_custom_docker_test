@@ -1,5 +1,5 @@
 # 빌드 단계
-FROM node:16-buster AS builder
+FROM node:18-buster AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
