@@ -1,137 +1,170 @@
 import Phaser from 'phaser';
-// import logoImg from './assets/logo.png';
 import bgImg1 from "./assets/background.png";
 import playerImg from "./assets/player.png";
+import io from 'socket.io-client';
 
-
-class MyGame extends Phaser.Scene
-{
-    constructor ()
-    {
+class MyGame extends Phaser.Scene {
+    constructor() {
         super();
+        this.otherPlayers = {};
+        this.lastPosition = { x: 0, y: 0 };
+        this.nickname = ''; // 사용자 닉네임
     }
 
-    preload ()
-    {
-        // this.load.image('logo', logoImg);
-        
+    preload() {
         this.load.image("background1", bgImg1);
-        // this.load.image("player", playerImg);
-
-        // SPRITESHEETS
         this.load.spritesheet("player", playerImg, {
             frameWidth: 32,
             frameHeight: 36,
         });
     }
 
-    create ()
-    {
-        // const logo = this.add.image(400, 150, 'logo');
-        // this.tweens.add({
-        //     targets: logo,
-        //     y: 450,
-        //     duration: 2000,
-        //     ease: "Power2",
-        //     yoyo: true,
-        //     loop: -1
-        // });        
+    create() {
+        this.background1 = this.add.image(0, 0, "background1").setOrigin(0, 0);
+        this.player = this.add.sprite(this.sys.game.config.width / 2, this.sys.game.config.height / 2, "player");
 
-        // BACKGROUND
-        // this.background1 = this.add.tileSprite(
-        //     0,
-        //     0,
-        //     800,
-        //     600,
-        //     "background1"
-        //   ).setOrigin(0, 0);
-
-        this.background1 = this.add.image(0, 0, "background1");
-        // 이걸 안할 경우 load 되는 이미지의 중심점으로 잡아 1/4 크기가 됨
-        this.background1.setOrigin(0, 0);
-
-        // PLAYERS
-        // this.player = this.add.image(config.width/2, config.height/2, "player");
-        this.player = this.add.sprite(config.width/2, config.height/2, "player"); // 위에서 spritesheet로 load를 하면 여기를 sprite로 바꿔줌
-        // this.player.setOrigin(0, 0); // 숫자를 계속 올려보세요.
-        // this.player.scale = 2; // 숫자를 계속 올려보세요.
-        // this.player.flipY = true;
-        // this.player.angle += 10; // 숫자를 계속 올려보세요.
-        // PLAYERS
         this.anims.create({
-            key: "player_anim", // 애니메이션 이름
-            frames: this.anims.generateFrameNumbers("player"), // 플레이어를 사용하고
-            frameRate: 12, // 1초당 20 프레임
-            repeat: -1, // -1이 infinity
+            key: "player_anim",
+            frames: this.anims.generateFrameNumbers("player"),
+            frameRate: 12,
+            repeat: -1,
         });
 
         this.anims.create({
             key: "player_idle",
-            frames: this.anims.generateFrameNumbers("player", {
-              start: 0,
-              end: 0,
-            }),
+            frames: this.anims.generateFrameNumbers("player", { start: 0, end: 0 }),
             frameRate: 1,
             repeat: 0,
         });
 
-
-        // 안내문구
         this.add.text(10, 10, "'위니브 월드 : 새로운 시대'에 오신 것을 환영합니다.", {
             font: '25px 배달의민족 주아 OTF',
-            fill: '#f5e99f' // 16진수나 컬러이름이 들어갑니다.
-        })
+            fill: '#f5e99f'
+        });
 
         this.player.play("player_anim");
-
         this.keyboardInput = this.input.keyboard.createCursorKeys();
         this.player.m_moving = false;
-        console.log('create')
+
+        this.socket = io('http://localhost:3000');
+
+        // 캐릭터 머리 위에 닉네임을 표시하기 위한 텍스트 스타일
+        const nameTextStyle = {
+            font: 'bold 16px Arial',
+            fill: '#ffffff',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)', // 닉네임 배경색
+            padding: {
+                x: 8,
+                y: 4,
+            },
+        };
+
+        this.socket.on('players', (players) => {
+            Object.keys(players).forEach(id => {
+                if (id === this.socket.id) {
+                    return;
+                }
+                if (this.otherPlayers[id]) {
+                    // 플레이어 위치 업데이트
+                    this.otherPlayers[id].sprite.x = players[id].x;
+                    this.otherPlayers[id].sprite.y = players[id].y;
+                    // 플레이어 닉네임 업데이트
+                    this.otherPlayers[id].nameText.setPosition(players[id].x, players[id].y - 50);
+                    this.otherPlayers[id].nameText.setText(players[id].nickname);
+                } else {
+                    // 새 플레이어 생성
+                    const newPlayer = this.add.sprite(players[id].x, players[id].y, 'player');
+                    newPlayer.play('player_anim');
+                    const nameText = this.add.text(players[id].x, players[id].y - 50, players[id].nickname, nameTextStyle).setOrigin(0.5, 1.5);
+                    this.otherPlayers[id] = { sprite: newPlayer, nameText: nameText };
+                }
+            });
+        });
+
+        this.setupChat();
     }
 
-    update(){
-        this.move(this.player)
+    setupChat() {
+        const chatDiv = document.createElement('div');
+        chatDiv.id = 'chat';
+        chatDiv.innerHTML = `
+            <div id="messages" style="height: 200px; overflow-y: scroll;"></div>
+            <input type="text" id="nickname" placeholder="닉네임" />
+            <input type="text" id="chat-input" placeholder="메시지 입력" />
+            <button id="send-button">보내기</button>
+        `;
+        document.body.appendChild(chatDiv);
+
+        const nicknameInput = document.getElementById('nickname');
+        const chatInput = document.getElementById('chat-input');
+        const sendButton = document.getElementById('send-button');
+        const messagesDiv = document.getElementById('messages');
+
+        sendButton.addEventListener('click', () => {
+            this.nickname = nicknameInput.value.trim();
+            const message = chatInput.value.trim();
+            chatInput.value = '';
+            if (this.nickname && message) {
+                this.socket.emit('chatMessage', { nickname: this.nickname, message });
+            }
+        });
+
+        this.socket.on('chatMessage', (data) => {
+            const messageElement = document.createElement('div');
+            messageElement.textContent = `${data.nickname}: ${data.message}`;
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
     }
 
-    move(player) {
-        const PLAYER_SPEED = 0.2;
+    update() {
+        this.movePlayer();
+        this.updatePlayerName();
+    }
 
-        // player.x += vector[0] * Player.PLAYER_SPEED;
-        // player.y += vector[1] * Player.PLAYER_SPEED;
-        // player.y += PLAYER_SPEED;
-    
-        if (this.keyboardInput.left.isDown || this.keyboardInput.right.isDown || this.keyboardInput.up.isDown || this.keyboardInput.down.isDown) {
-            console.log('press')
-            if (!player.m_moving) {
-                player.play("player_anim");
-            }
-            player.m_moving = true;
-        } else {
-            if (player.m_moving) {
-                player.play("player_idle");
-            }
-            player.m_moving = false;
-        }
+    movePlayer() {
+        const PLAYER_SPEED = 10;
+        let moved = false;
 
-        // 캐릭터 이미지 원본은 왼쪽을 바라보고 있습니다.
-        // flipX 프로퍼티는 boolean 값을 받아 x축 방향으로 뒤집혀있을지 아닐지를 설정합니다.
-        // player가 왼쪽으로 이동할 때는 flipX = false,
-        // player가 오른쪽쪽으로 이동할 때는 flipX = true로 설정해 적절한 방향을 바라보게 해 줍니다.
         if (this.keyboardInput.left.isDown) {
-            player.x -= PLAYER_SPEED;
-            player.flipX = false;
+            this.player.x -= PLAYER_SPEED;
+            this.player.flipX = false;
+            moved = true;
         } else if (this.keyboardInput.right.isDown) {
-            player.x += PLAYER_SPEED;
-            player.flipX = true;
+            this.player.x += PLAYER_SPEED;
+            this.player.flipX = true;
+            moved = true;
         }
+
         if (this.keyboardInput.up.isDown) {
-            player.y -= PLAYER_SPEED;
+            this.player.y -= PLAYER_SPEED;
+            moved = true;
         } else if (this.keyboardInput.down.isDown) {
-            player.y += PLAYER_SPEED;
+            this.player.y += PLAYER_SPEED;
+            moved = true;
+        }
+
+        if (moved) {
+            if (this.player.x !== this.lastPosition.x || this.player.y !== this.lastPosition.y) {
+                this.socket.emit('move', { x: this.player.x, y: this.player.y });
+                this.lastPosition = { x: this.player.x, y: this.player.y };
+                this.updatePlayerName();
+            }
         }
     }
 
-
+    updatePlayerName() {
+        // 플레이어 이름을 플레이어 위치 위에 업데이트
+        if (!this.playerNameText) {
+            this.playerNameText = this.add.text(this.player.x, this.player.y, this.nickname, { 
+                font: 'bold 16px Arial', 
+                fill: '#ffffff' 
+            }).setOrigin(0.5, 1.5);
+        } else {
+            this.playerNameText.setPosition(this.player.x, this.player.y - 50); // 50은 캐릭터 위에 표시되는 높이
+            this.playerNameText.setText(this.nickname);
+        }
+    }
 }
 
 const config = {
@@ -143,7 +176,7 @@ const config = {
     physics: {
         default: "arcade",
         arcade: {
-            debug: "true",
+            debug: true,
         },
     },
     scene: MyGame
